@@ -8,11 +8,28 @@ const upload = multer({ storage: storage })
 
 dotenv.config()
 
+import { PutObjectCommand } from "@aws-sdk/client-s3"
+import s3 from "./services/s3Client.js"
+
 const app = express()
 
-app.post('/upload', upload.single("file"), (req, res) => {
+app.post('/upload', upload.single("file"), async (req, res) => {
+    const username = "himavanth"
+
     try {
-        console.log(req.file)
+        if (!req.file) {
+            return res.status(400).json({
+                message: "File not found!"
+            })
+        }
+        const uploadCommand = new PutObjectCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Key: `users/${username}/${req.file.originalname}`,
+            Body: req.file.buffer,
+        });
+
+        await s3.send(uploadCommand);
+
         return res.status(200).json({
             message: "Uploaded Successfully!",
             data: {
