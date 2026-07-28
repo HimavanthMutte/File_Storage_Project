@@ -9,12 +9,13 @@ const upload = multer({ storage: storage })
 dotenv.config()
 
 import { PutObjectCommand } from "@aws-sdk/client-s3"
+import { ListObjectsCommand } from "@aws-sdk/client-s3"
 import s3 from "./services/s3Client.js"
 
 const app = express()
+const username = "himavanth"
 
 app.post('/upload', upload.single("file"), async (req, res) => {
-    const username = "himavanth"
 
     try {
         if (!req.file) {
@@ -44,6 +45,28 @@ app.post('/upload', upload.single("file"), async (req, res) => {
             message: "Something went wrong.."
         })
     }
+})
+
+app.get("/users/:userId/files", async (req, res) => {
+    const { userId } = req.params
+
+    const listFilesCommand = new ListObjectsCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Prefix: `users/${username}/`
+    })
+
+    const response = await s3.send(listFilesCommand);
+
+    const files = response.Contents.map(fileContent => ({
+        fileName: fileContent.Key.split("/").at(-1),
+        lastModified: fileContent.LastModified,
+        size: fileContent.Size,
+        format: fileContent.Key.split("/").at(-1).split(".").at(-1),
+    }))
+
+    return res.status(200).json({
+        data: files
+    })
 })
 
 app.get('/health', (req, res) => {
