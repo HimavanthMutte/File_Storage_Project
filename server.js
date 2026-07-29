@@ -6,6 +6,10 @@ import multer from "multer"
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
+import { authMiddleware } from "./middlewares/authMiddleware.js"
+import { signup, login } from "./controllers/auth/authController.js"
+import { getFiles, uploadFile } from "./controllers/fileController.js"
+
 dotenv.config()
 
 import { PutObjectCommand } from "@aws-sdk/client-s3"
@@ -13,9 +17,20 @@ import { ListObjectsCommand } from "@aws-sdk/client-s3"
 import s3 from "./services/s3Client.js"
 
 const app = express()
-const username = "himavanth"
 
-app.post('/upload', upload.single("file"), async (req, res) => {
+import mongoose from "mongoose"
+
+await mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("Connected"))
+
+app.use(express.json())
+
+app.post('/signup', signup)
+
+app.post('/login', login)
+
+
+app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
 
     try {
         if (!req.file) {
@@ -25,18 +40,22 @@ app.post('/upload', upload.single("file"), async (req, res) => {
         }
         const uploadCommand = new PutObjectCommand({
             Bucket: process.env.BUCKET_NAME,
-            Key: `users/${username}/${req.file.originalname}`,
+            Key: `users/${req.user.userId}/${req.file.originalname}`,
             Body: req.file.buffer,
         });
 
         await s3.send(uploadCommand);
 
+        const savedFile = await uploadFile({
+            user: req.user.userId,
+            file_name: req.file.originalname,
+            file_key: req.file.originalname,
+            file_size: req.file.size,
+            mime_type: req.file.mimetype
+        });
+
         return res.status(200).json({
-            message: "Uploaded Successfully!",
-            data: {
-                name: req.file.originalname,
-                format: req.file.mimetype
-            }
+            message: "Uploaded Successfully!"
         })
     }
     catch (err) {
@@ -47,26 +66,41 @@ app.post('/upload', upload.single("file"), async (req, res) => {
     }
 })
 
-app.get("/users/:userId/files", async (req, res) => {
-    const { userId } = req.params
+app.get("/files", authMiddleware, async (req, res) => {
 
-    const listFilesCommand = new ListObjectsCommand({
-        Bucket: process.env.BUCKET_NAME,
-        Prefix: `users/${username}/`
-    })
+    try {
+        const listFilesCommand = new ListObjectsCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Prefix: `users/${req.user.userId}/`
+        })
 
-    const response = await s3.send(listFilesCommand);
+        const response = await s3.send(listFilesCommand);
 
-    const files = response.Contents.map(fileContent => ({
-        fileName: fileContent.Key.split("/").at(-1),
-        lastModified: fileContent.LastModified,
-        size: fileContent.Size,
-        format: fileContent.Key.split("/").at(-1).split(".").at(-1),
-    }))
+        console.log(response)
 
-    return res.status(200).json({
-        data: files
-    })
+        if (!response.Contents) {
+            return res.status(200).json({
+                message: "No files found"
+            })
+        }
+
+        const files = response.Contents.map(fileContent => ({
+            fileName: fileContent.Key.split("/").at(-1),
+            lastModified: fileContent.LastModified,
+            size: fileContent.Size,
+            format: fileContent.Key.split("/").at(-1).split(".").at(-1),
+        }))
+
+        return res.status(200).json({
+            data: files
+        })
+    }
+    catch (error) {
+        console.log(error.message)
+        return res.status(500).json({
+            message: "Something went wrong.."
+        })
+    }
 })
 
 app.get('/health', (req, res) => {
