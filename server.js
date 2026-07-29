@@ -52,12 +52,16 @@ app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
 
         await s3.send(uploadCommand);
 
+        const savedFile = await uploadFile({
+            user: req.user.userId,
+            file_name: req.file.originalname,
+            file_key: req.file.originalname,
+            file_size: req.file.size,
+            mime_type: req.file.mimetype
+        });
+
         return res.status(200).json({
-            message: "Uploaded Successfully!",
-            data: {
-                name: req.file.originalname,
-                format: req.file.mimetype
-            }
+            message: "Uploaded Successfully!"
         })
     }
     catch (err) {
