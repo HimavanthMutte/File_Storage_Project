@@ -6,7 +6,6 @@ import multer from "multer"
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
-import connectDB from "./services/mongoClient.js"
 import { authMiddleware } from "./middlewares/authMiddleware.js"
 import { signup, login } from "./controllers/auth/authController.js"
 import { getFiles, uploadFile } from "./controllers/fileController.js"
@@ -18,11 +17,6 @@ import { ListObjectsCommand } from "@aws-sdk/client-s3"
 import s3 from "./services/s3Client.js"
 
 const app = express()
-const username = "himavanth"
-
-import User from "./models/users.js"
-import bcrypt from "bcrypt"
-import jwt from "jsonwebtoken"
 
 import mongoose from "mongoose"
 
@@ -46,7 +40,7 @@ app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
         }
         const uploadCommand = new PutObjectCommand({
             Bucket: process.env.BUCKET_NAME,
-            Key: `users/${username}/${req.file.originalname}`,
+            Key: `users/${req.user.userId}/${req.file.originalname}`,
             Body: req.file.buffer,
         });
 
@@ -72,26 +66,41 @@ app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
     }
 })
 
-app.get("/users/:userId/files", authMiddleware, async (req, res) => {
-    const { userId } = req.params
+app.get("/files", authMiddleware, async (req, res) => {
 
-    const listFilesCommand = new ListObjectsCommand({
-        Bucket: process.env.BUCKET_NAME,
-        Prefix: `users/${username}/`
-    })
+    try {
+        const listFilesCommand = new ListObjectsCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Prefix: `users/${req.user.userId}/`
+        })
 
-    const response = await s3.send(listFilesCommand);
+        const response = await s3.send(listFilesCommand);
 
-    const files = response.Contents.map(fileContent => ({
-        fileName: fileContent.Key.split("/").at(-1),
-        lastModified: fileContent.LastModified,
-        size: fileContent.Size,
-        format: fileContent.Key.split("/").at(-1).split(".").at(-1),
-    }))
+        console.log(response)
 
-    return res.status(200).json({
-        data: files
-    })
+        if (!response.Contents) {
+            return res.status(200).json({
+                message: "No files found"
+            })
+        }
+
+        const files = response.Contents.map(fileContent => ({
+            fileName: fileContent.Key.split("/").at(-1),
+            lastModified: fileContent.LastModified,
+            size: fileContent.Size,
+            format: fileContent.Key.split("/").at(-1).split(".").at(-1),
+        }))
+
+        return res.status(200).json({
+            data: files
+        })
+    }
+    catch (error) {
+        console.log(error.message)
+        return res.status(500).json({
+            message: "Something went wrong.."
+        })
+    }
 })
 
 app.get('/health', (req, res) => {
