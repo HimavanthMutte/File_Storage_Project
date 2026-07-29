@@ -7,6 +7,9 @@ const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
 import connectDB from "./services/mongoClient.js"
+import { authMiddleware } from "./middlewares/authMiddleware.js"
+import { signup, login } from "./controllers/auth/authController.js"
+import { getFiles, uploadFile } from "./controllers/fileController.js"
 
 dotenv.config()
 
@@ -17,8 +20,23 @@ import s3 from "./services/s3Client.js"
 const app = express()
 const username = "himavanth"
 
+import User from "./models/users.js"
+import bcrypt from "bcrypt"
+import jwt from "jsonwebtoken"
 
-app.post('/upload', upload.single("file"), async (req, res) => {
+import mongoose from "mongoose"
+
+await mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("Connected"))
+
+app.use(express.json())
+
+app.post('/signup', signup)
+
+app.post('/login', login)
+
+
+app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
 
     try {
         if (!req.file) {
@@ -50,7 +68,7 @@ app.post('/upload', upload.single("file"), async (req, res) => {
     }
 })
 
-app.get("/users/:userId/files", async (req, res) => {
+app.get("/users/:userId/files", authMiddleware, async (req, res) => {
     const { userId } = req.params
 
     const listFilesCommand = new ListObjectsCommand({
@@ -73,7 +91,6 @@ app.get("/users/:userId/files", async (req, res) => {
 })
 
 app.get('/health', (req, res) => {
-    connectDB()
     return res.status(200).json({
         message: "OK! Himavanth doing good.."
     })
