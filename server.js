@@ -6,6 +6,8 @@ import multer from "multer"
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
+import connectDB from "./services/mongoClient.js"
+
 dotenv.config()
 
 import { PutObjectCommand } from "@aws-sdk/client-s3"
@@ -14,6 +16,7 @@ import s3 from "./services/s3Client.js"
 
 const app = express()
 const username = "himavanth"
+
 
 app.post('/upload', upload.single("file"), async (req, res) => {
 
@@ -70,6 +73,7 @@ app.get("/users/:userId/files", async (req, res) => {
 })
 
 app.get('/health', (req, res) => {
+    connectDB()
     return res.status(200).json({
         message: "OK! Himavanth doing good.."
     })
