@@ -8,7 +8,7 @@ const upload = multer({ storage: storage })
 
 import { authMiddleware } from "./middlewares/authMiddleware.js"
 import { signup, login } from "./controllers/auth/authController.js"
-import { getFiles, uploadFile } from "./controllers/fileController.js"
+import { getFiles, uploadFile, getFile } from "./controllers/fileController.js"
 
 dotenv.config()
 
@@ -29,8 +29,7 @@ app.post('/signup', signup)
 
 app.post('/login', login)
 
-
-app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
+app.post('/files/upload', authMiddleware, upload.single("file"), async (req, res) => {
 
     try {
         if (!req.file) {
@@ -94,6 +93,33 @@ app.get("/files", authMiddleware, async (req, res) => {
             message: "Something went wrong.."
         })
     }
+})
+
+app.get("/files/:fileId", authMiddleware, async (req, res) => {
+    const { fileId } = req.params
+
+    const dbResponse = await getFile(fileId, req.user.userId)
+
+    if (!dbResponse) {
+        return res.status(404).json({
+            message: "File not found!"
+        })
+    }
+
+    const formattedDbResponse = {
+        fileId: dbResponse._id,
+        fileName: dbResponse.file_name,
+        fileKey: dbResponse.file_key,
+        fileSize: dbResponse.file_size,
+        mimeType: dbResponse.mime_type,
+        createdAt: dbResponse.createdAt,
+        updatedAt: dbResponse.updatedAt,
+    }
+
+    return res.status(200).json({
+        data: formattedDbResponse
+    })
+
 })
 
 app.get('/health', (req, res) => {
