@@ -3,17 +3,20 @@ import dotenv from "dotenv"
 
 import multer from "multer"
 
+import fs from "fs/promises";
+
+
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
 import { authMiddleware } from "./middlewares/authMiddleware.js"
 import { signup, login } from "./controllers/auth/authController.js"
-import { getFiles, uploadFile, getFile } from "./controllers/fileController.js"
+import { getFiles, uploadFile, getFileById, getFileByName } from "./controllers/fileController.js"
 
 dotenv.config()
 
-import { PutObjectCommand } from "@aws-sdk/client-s3"
-import { ListObjectsCommand } from "@aws-sdk/client-s3"
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3"
+
 import s3 from "./services/s3Client.js"
 
 const app = express()
@@ -98,7 +101,7 @@ app.get("/files", authMiddleware, async (req, res) => {
 app.get("/files/:fileId", authMiddleware, async (req, res) => {
     const { fileId } = req.params
 
-    const dbResponse = await getFile(fileId, req.user.userId)
+    const dbResponse = await getFileById(fileId, req.user.userId)
 
     if (!dbResponse) {
         return res.status(404).json({
@@ -120,6 +123,44 @@ app.get("/files/:fileId", authMiddleware, async (req, res) => {
         data: formattedDbResponse
     })
 
+})
+
+app.get("/files/:fileName/download", authMiddleware, async (req, res) => {
+    try {
+        const { fileName } = req.params
+
+        const dbResponse = await getFileByName(fileName, req.user.userId)
+
+        if (!dbResponse) {
+            return res.status(404).json({
+                message: "File not found!"
+            })
+        }
+
+        const downloadCommand = new GetObjectCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Key: `users/${req.user.userId}/${fileName}`
+        })
+
+        await fs.mkdir("downloads", { recursive: true });
+
+        const s3Response = await s3.send(downloadCommand)
+
+        const buffer = await s3Response.Body.transformToByteArray();
+
+        await fs.writeFile(`downloads/${fileName}`, Buffer.from(buffer));
+
+        return res.status(200).json({
+            message: "File downloaded successfully!"
+        })
+    }
+    catch (error) {
+        console.log(error.message)
+        return res.status(500).json({
+            message: "Something went wrong.."
+        })
+
+    }
 })
 
 app.get('/health', (req, res) => {
