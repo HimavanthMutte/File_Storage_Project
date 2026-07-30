@@ -75,6 +75,7 @@ app.get("/files", authMiddleware, async (req, res) => {
         const dbResponse = await getFiles(req.user.userId)
 
         const formattedDbResponse = dbResponse.map(response => ({
+            fileId: response._id,
             fileName: response.file_name,
             fileKey: response.file_key,
             fileSize: response.file_size,
@@ -82,7 +83,6 @@ app.get("/files", authMiddleware, async (req, res) => {
             createdAt: response.createdAt,
             updatedAt: response.updatedAt,
         }))
-
 
         return res.status(200).json({
             data: formattedDbResponse
