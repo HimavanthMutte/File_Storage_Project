@@ -29,7 +29,7 @@ app.post('/signup', signup)
 
 app.post('/login', login)
 
-app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
+app.post('/files/upload', authMiddleware, upload.single("file"), async (req, res) => {
 
     try {
         if (!req.file) {
@@ -95,7 +95,7 @@ app.get("/files", authMiddleware, async (req, res) => {
     }
 })
 
-app.get("/file/:fileId", authMiddleware, async (req, res) => {
+app.get("/files/:fileId", authMiddleware, async (req, res) => {
     const { fileId } = req.params
 
     const dbResponse = await getFile(fileId, req.user.userId)
@@ -105,7 +105,6 @@ app.get("/file/:fileId", authMiddleware, async (req, res) => {
             message: "File not found!"
         })
     }
-
 
     const formattedDbResponse = {
         fileId: dbResponse._id,
