@@ -44,12 +44,14 @@ app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
             Body: req.file.buffer,
         });
 
-        await s3.send(uploadCommand);
+        const s3Response = await s3.send(uploadCommand);
+
+        console.log(s3Response)
 
         const savedFile = await uploadFile({
             user: req.user.userId,
             file_name: req.file.originalname,
-            file_key: req.file.originalname,
+            file_key: `users/${req.user.userId}/${req.file.originalname}`,
             file_size: req.file.size,
             mime_type: req.file.mimetype
         });
@@ -69,30 +71,21 @@ app.post('/upload', authMiddleware, upload.single("file"), async (req, res) => {
 app.get("/files", authMiddleware, async (req, res) => {
 
     try {
-        const listFilesCommand = new ListObjectsCommand({
-            Bucket: process.env.BUCKET_NAME,
-            Prefix: `users/${req.user.userId}/`
-        })
 
-        const response = await s3.send(listFilesCommand);
+        const dbResponse = await getFiles(req.user.userId)
 
-        console.log(response)
-
-        if (!response.Contents) {
-            return res.status(200).json({
-                message: "No files found"
-            })
-        }
-
-        const files = response.Contents.map(fileContent => ({
-            fileName: fileContent.Key.split("/").at(-1),
-            lastModified: fileContent.LastModified,
-            size: fileContent.Size,
-            format: fileContent.Key.split("/").at(-1).split(".").at(-1),
+        const formattedDbResponse = dbResponse.map(response => ({
+            fileName: response.file_name,
+            fileKey: response.file_key,
+            fileSize: response.file_size,
+            mimeType: response.mime_type,
+            createdAt: response.createdAt,
+            updatedAt: response.updatedAt,
         }))
 
+
         return res.status(200).json({
-            data: files
+            data: formattedDbResponse
         })
     }
     catch (error) {

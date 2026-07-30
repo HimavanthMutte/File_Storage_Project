@@ -1,13 +1,14 @@
 import File from "../models/files.js";
 
-export const getFiles = async (req, res) => {
+export const getFiles = async (userId) => {
     try {
         const files = await File.find({
-            user: req.params.userId
+            user: userId
         });
-        res.status(200).json(files);
+        return files;
     } catch (error) {
-        res.status(500).json({ message: "Server error" });
+        console.log(error.message)
+        throw new error
     }
 };
 
