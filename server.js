@@ -150,9 +150,7 @@ app.get("/files/:fileName/download", authMiddleware, async (req, res) => {
 
         await fs.writeFile(`downloads/${fileName}`, Buffer.from(buffer));
 
-        return res.status(200).json({
-            message: "File downloaded successfully!"
-        })
+        return res.download(`downloads/${fileName}`)
     }
     catch (error) {
         console.log(error.message)
